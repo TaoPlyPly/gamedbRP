@@ -33,38 +33,33 @@ class Manager:
             INNER JOIN tblRoms ro on r.releaseId = ro.releaseId
             LEFT JOIN tblReleaseFlagValues rfv on rfv.releaseId = r.releaseId AND rfv.releaseFlagID = 1
             LEFT JOIN tblReleaseFlagValues rfv2 on rfv2.releaseId = r.releaseId AND rfv2.releaseFlagID = 3
-            WHERE sy.systemId = 44
+            WHERE sy.systemId = 26
             GROUP BY 1
             """
         self.cur.execute(sql)
         for row in self.cur:
-            crcDic[row[0]]=row[1]
+            crcDic[row[1]]=row[0]
         return crcDic
 
-    def listRoms(self,romPath):
+    def copyFiles(self,romPath,bestRomPath,crcDic):
         for filename in os.listdir(romPath):
             if filename.endswith("zip"):
                 crc = self.getCRC(os.path.join(romPath, filename))
-                print filename + ' : ' + crc
+                if crc in crcDic:
+                    copyfile(os.path.join(romPath, filename),os.path.join(bestRomPath, filename))
             
     def getCRC(self,filepath):
         zf = ZipFile(filepath)
         rom = zf.infolist()[0]
         return format(rom.CRC,"08X")
-
-    def copyFiles(self,crcDic):
-        for romFile in crcDic.iteritems():
-            print romFile
-            #copyfile(src,dst)
         
 if __name__ == '__main__':
-    bestRomPath='roms/'
-    romPath='source/'
+    bestRomPath='roms/Nintendo - Game Boy/'
+    romPath='source/Nintendo - Game Boy/'
 
     manager = Manager()
     crcDic = manager.getCRCDic()
-    manager.listRoms(romPath)
-    print manager.getCRCDic()
+    manager.copyFiles(romPath,bestRomPath,manager.getCRCDic())
     manager.close()
     
     
