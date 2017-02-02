@@ -21,9 +21,17 @@ class Manager:
     def close(self):
         self.con.close()
 
-    def getCRCDic(self):
+    def getSystems(self):
+        systemDic = {}
+        sql = "SELECT systemManufacturer || ' - ' || systemName, systemId FROM tblSystems"
+        self.cur.execute(sql)
+        for row in self.cur:
+            systemDic[row[1]]=row[0]
+        return systemDic 
+
+    def getCRCDic(self,systemId):
         crcDic = {}
-        #Test SNK Neo Geo Pocket, USA > Europe > Japan
+        #Test USA > Europe > Japan
         sql = """SELECT s.softwareName,ro.crc32,
 	    MAX(CASE WHEN rfv.releaseFlagValue = "USA" THEN 3 WHEN rfv.releaseFlagValue = "Europe" THEN 2 WHEN rfv.releaseFlagValue = "Japan" THEN 1 ELSE 0 END) as Region,
 	    MAX(CASE WHEN rfv2.releaseFlagValue IS NULL THEN 0 ELSE rfv2.releaseFlagValue END) as Version
@@ -33,33 +41,43 @@ class Manager:
             INNER JOIN tblRoms ro on r.releaseId = ro.releaseId
             LEFT JOIN tblReleaseFlagValues rfv on rfv.releaseId = r.releaseId AND rfv.releaseFlagID = 1
             LEFT JOIN tblReleaseFlagValues rfv2 on rfv2.releaseId = r.releaseId AND rfv2.releaseFlagID = 3
-            WHERE sy.systemId = 26
-            GROUP BY 1
-            """
+            WHERE sy.systemId = """
+        sql += str(systemId) + " GROUP BY 1"
+            
         self.cur.execute(sql)
         for row in self.cur:
             crcDic[row[1]]=row[0]
         return crcDic
 
-    def copyFiles(self,romPath,bestRomPath,crcDic):
-        for filename in os.listdir(romPath):
-            if filename.endswith("zip"):
-                crc = self.getCRC(os.path.join(romPath, filename))
-                if crc in crcDic:
-                    copyfile(os.path.join(romPath, filename),os.path.join(bestRomPath, filename))
-            
+    def copyFiles(self,romPath,bestRomPath):
+        systemDic = self.getSystems()
+        for systemId,systemName in systemDic.iteritems():
+            if (os.path.isdir(romPath + systemName)):
+                romDir = romPath + systemName
+                bestRomDir = bestRomPath + systemName
+                print "Copying " + romDir
+                if (os.path.isdir(bestRomDir)):
+                    pass
+                else:
+                    os.makedirs(bestRomDir)
+                crcDic = self.getCRCDic(systemId)
+                for filename in os.listdir(romDir):
+                    if filename.endswith("zip"):
+                        crc = self.getCRC(os.path.join(romDir, filename))
+                        if crc in crcDic:
+                            copyfile(os.path.join(romDir, filename),os.path.join(bestRomDir, filename))
+
     def getCRC(self,filepath):
         zf = ZipFile(filepath)
         rom = zf.infolist()[0]
         return format(rom.CRC,"08X")
         
 if __name__ == '__main__':
-    bestRomPath='roms/Nintendo - Game Boy/'
-    romPath='source/Nintendo - Game Boy/'
+    bestRomPath='roms/'
+    romPath='source/'
 
     manager = Manager()
-    crcDic = manager.getCRCDic()
-    manager.copyFiles(romPath,bestRomPath,manager.getCRCDic())
+    manager.copyFiles(romPath,bestRomPath)
     manager.close()
     
     
